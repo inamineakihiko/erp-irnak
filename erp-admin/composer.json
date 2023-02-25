@@ -10,15 +10,16 @@
     "require": {
         "php": "^8.0.2",
         "aws/aws-sdk-php": "~3.0",
+        "cerbero/command-validator": "^2.5",
         "doctrine/dbal": "^2.3",
         "fruitcake/laravel-cors": "^3.0",
+        "guzzlehttp/guzzle": "^7.2",
         "laravel/framework": "^9.19",
         "laravel/helpers": "^1.5",
+        "laravel/sanctum": "^3.0",
         "laravel/tinker": "^2.7",
         "nesbot/carbon": "^2.27",
-        "laravel/sanctum": "^3.0",
-        "olssonm/l5-very-basic-auth": "6.*",
-        "guzzlehttp/guzzle": "^7.2"
+        "olssonm/l5-very-basic-auth": "6.*"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^2.8",

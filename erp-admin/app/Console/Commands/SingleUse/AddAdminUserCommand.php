@@ -4,10 +4,9 @@ declare(strict_types=1);
 namespace App\Console\Commands\SingleUse;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Ramsey\Uuid\Uuid;
-use Carbon\Carbon;
+use App\Models\Admin;
+use Illuminate\Validation\ValidationException;
+
 /**
  * 管理者登録
  *
@@ -16,9 +15,18 @@ use Carbon\Carbon;
  */
 class AddAdminUserCommand extends Command
 {
-    /** @var string コマンド */
-    protected $signature = 'command:admin_register';
-    /** @var string コマンド詳細 */
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'command:admin {login_id} {password}';
+
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
     protected $description = '管理者登録';
 
     /**
@@ -28,53 +36,59 @@ class AddAdminUserCommand extends Command
      */
     public function __construct()
     {
-      parent::__construct();
+        parent::__construct();
     }
 
     /**
      * Execute the console command.
      *
-     * @return void
+     *
      */
     public function handle()
     {
-      $name = $this->ask('登録するlogin_id(半角英数字のみ)を入力してください。');
-      $password = $this->secret('登録するpasswordを入力してください。');
 
-      if (preg_match("/^[a-zA-Z0-9]{5,10}+$/",$name)) {
-        $this->info("login_id : $name");
-      } else {
-        $this->info("login_idは半角英数字かつ5文字以上10文字以内で入力してください。");
-        return 0;
-      }
+        try {
+            $this->validate();
+        } catch (ValidationException $e) {
+            $this->error('validation error!');
+            foreach ($e->validator->getMessageBag()->all() as $error) {
+                $this->error($error);
+            }
+            return 0;
+        }
 
-      if (preg_match("/^[a-zA-Z0-9]{6,10}+$/",$password)) {
-        $this->info("password : $password");
-      } else {
-        $this->info("passwordは半角英数字かつ6文字以上10文字以内で入力してください");
-        return 0;
-      }
-
-      if ($this->confirm('この内容で登録してもよろしいでしょうか?')) {
-      $isExist = DB::table('admins')->where('login_id', '=', $name)->first();
-      if($isExist){
-        $this->info('既に登録されているlogin_idですので他のlogin_idで登録してください。');
-        return 0;
-        } else {
-          DB::table('admins')->insert([
-            'uuid'  => Uuid::uuid4()->toString(),
-            'login_id'   => $name,
-            'password' =>  Hash::make($password),
-            'created_at' => Carbon::now('Asia/Tokyo'),
-            'updated_at' => Carbon::now('Asia/Tokyo'),
-          ]);
-          $this->table(
-            ['login_id','password'],
-            [[$name,$password]]
+        $this->create();
+        $login_id = $this->argument('login_id');
+        $password = $this->argument('password');
+        $this->table(
+            ['login_id', 'password'],
+            [
+                [$login_id,$password]
+            ]
         );
-      }
-    } else {
-      $this->error('もう一度最初からやり直してください');
+
+        $this->info('登録完了！');
     }
-  }
+    private function validate()
+    {
+        \Validator::validate(
+            array_filter($this->arguments()),
+            [
+                'login_id' => 'unique:admins',
+            ],
+            [
+                'login_id.unique' => '既に使われているlogin_idです。'
+            ]
+        );
+    }
+    private function create()
+    {
+        $login_id = $this->argument('login_id');
+        $password = $this->argument('password');
+        Admin::factory()->create([
+            'login_id' => $login_id,
+            'password' => \Hash::make($password)
+        ]);
+    }
+
 }
