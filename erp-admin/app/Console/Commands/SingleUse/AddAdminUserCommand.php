@@ -5,8 +5,8 @@ namespace App\Console\Commands\SingleUse;
 
 use Illuminate\Console\Command;
 use App\Models\Admin;
-use Illuminate\Validation\ValidationException;
-
+use Illuminate\Support\Facades\DB;
+use Exception;
 /**
  * 管理者登録
  *
@@ -20,7 +20,7 @@ class AddAdminUserCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'command:admin {login_id} {password}';
+    protected $signature = 'command:admin';
 
     /**
      * The console command description.
@@ -28,7 +28,7 @@ class AddAdminUserCommand extends Command
      * @var string
      */
     protected $description = '管理者登録';
-
+    private $error ;
     /**
      * Create a new command instance.
      *
@@ -46,49 +46,61 @@ class AddAdminUserCommand extends Command
      */
     public function handle()
     {
+        $this->info('登録作業を始めます');
 
-        try {
-            $this->validate();
-        } catch (ValidationException $e) {
-            $this->error('validation error!');
-            foreach ($e->validator->getMessageBag()->all() as $error) {
-                $this->error($error);
-            }
-            return 0;
+        $login_id = $this->ask('login_idを入力してください。');
+        $password = $this->secret('passwordを入力してください。');
+
+        $params = [
+            'loginId'  => $login_id,
+            'password'  => $password
+        ];
+
+         if($this->confirm('この内容で実行してよろしいですか?')) {
+          if($this->validate($params)){
+            $this->transaction($params);
+          }else{
+            $this->info('入力エラーです。');
+            $this->info($this->error);
+          }
+    }else{
+        $this->info('キャンセルとなります。');
+    } echo '登録終了';
+}
+
+    private function validate(array $params)
+    {
+        if (empty($params['loginId']) || empty($params['password'])) {
+            $this->error = 'ログインIDまたはパスワードが入力されていません!';
+            return false;
         }
-
-        $this->create();
-        $login_id = $this->argument('login_id');
-        $password = $this->argument('password');
-        $this->table(
-            ['login_id', 'password'],
-            [
-                [$login_id,$password]
-            ]
-        );
-
-        $this->info('登録完了！');
+        if (Admin::where('login_id', $params['loginId'])->exists()) {
+            $this->error = 'すでに使用されているログインIDです!';
+            return false;
+        }
+        return true;
     }
-    private function validate()
+
+    private function transaction(array $params)
     {
-        \Validator::validate(
-            array_filter($this->arguments()),
-            [
-                'login_id' => 'unique:admins',
-            ],
-            [
-                'login_id.unique' => '既に使われているlogin_idです。'
-            ]
-        );
+        try {
+            DB::beginTransaction();
+            $this->create($params);
+            DB::commit();
+            $this->info($params['loginId'].'を登録しました。');
+        } catch (Exception $e) {
+            DB::rollBack();
+            $this->error('エラーが発生しました。');
+            $this->error($e->getMessage());
+        }
     }
-    private function create()
+
+    private function create(array $params)
     {
-        $login_id = $this->argument('login_id');
-        $password = $this->argument('password');
-        Admin::factory()->create([
-            'login_id' => $login_id,
-            'password' => \Hash::make($password)
+        $admin = new Admin();
+        Admin::create([
+            'login_id' => $params['loginId'],
+            'password' => \Hash::make($params['password'])
         ]);
     }
-
 }
